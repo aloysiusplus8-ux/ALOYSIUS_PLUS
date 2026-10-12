@@ -79,6 +79,20 @@ nav button{transition:color .2s,border-color .2s}nav button:hover{color:var(--li
 .cd b{display:block;font-size:1.25rem;color:var(--lime);font-variant-numeric:tabular-nums}
 .cd em{font-style:normal;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;color:var(--mute)}
 .cd.msg{display:block;font-weight:700;padding:6px 0;color:var(--amber)}.cd.now{color:#ff3b30}.cd.done{color:var(--mute)}
+.board{margin:0 0 16px;border:1px solid var(--line);background:var(--panel);padding:14px 16px}
+.board .bt{text-align:center;margin-bottom:8px}
+.bs{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:.85rem;text-transform:uppercase;letter-spacing:.1em;color:var(--amber)}
+.bs.on{color:#ff3b30}.bs i{width:8px;height:8px;border-radius:50%;background:#ff3b30}
+.bm{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px}
+.bm .tm{font-weight:800;font-size:clamp(.95rem,3.4vw,1.4rem)}.bm .tm:first-child{text-align:right}
+.sc{display:flex;gap:10px;align-items:center;font-size:clamp(2rem,9vw,3.4rem);font-weight:900;color:var(--lime);font-variant-numeric:tabular-nums}.sc span{color:var(--mute)}
+.flash{display:inline-block;animation:flash 1.2s ease-out}@keyframes flash{0%{transform:scale(1.7);text-shadow:0 0 30px var(--lime)}100%{transform:none}}
+.adm{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}.adm label{display:grid;gap:6px;font-weight:600;font-size:.9rem}
+#admin input:not([type=checkbox]),#admin select{width:100%;background:var(--panel);color:var(--ink);border:1px solid var(--line);padding:10px;font:inherit}
+
+.scores>div{border:1px solid var(--line);background:var(--panel);padding:12px;text-align:center}
+.ctr{display:flex;justify-content:center;align-items:center;gap:16px;margin-top:8px}.ctr button{width:48px;height:48px;font-size:1.6rem;border:2px solid var(--lime);background:none;color:var(--lime);cursor:pointer}.ctr b{font-size:2.4rem;min-width:2ch}
+.chk{display:flex!important;align-items:center;gap:8px;margin-bottom:12px}
 *{font-stretch:100%!important}
 .hero>canvas.fx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0}
 @media(prefers-reduced-motion:no-preference){
@@ -150,6 +164,7 @@ nav button{transition:color .2s,border-color .2s}nav button:hover{color:var(--li
 <div class="page sub" id="live">
   <section class="wrap">
     <h2>Live</h2>
+    <div class="board" id="board" hidden></div>
     <div class="player" id="player"></div>
     <div class="livebar">
       <a class="btn" id="ytlink" href="https://www.youtube.com/" target="_blank" rel="noopener">Open on YouTube</a>
@@ -157,14 +172,31 @@ nav button{transition:color .2s,border-color .2s}nav button:hover{color:var(--li
     <p class="note">When no broadcast is running, the player shows our most recent stream. Check the Events page for upcoming broadcast times.</p>
   </section>
 </div>
+<div class="page sub" id="admin"><section class="wrap">
+    <h2>Score Admin</h2>
+    <div id="lock"><p class="note" style="margin-bottom:12px">Sign in with the admin email to update the live score.</p><div class="adm"><label>Admin email<input id="em" type="email" autocomplete="username"></label><label>Password<input id="pw" type="password" autocomplete="current-password"></label></div><button class="btn" id="unlock" style="padding:10px 18px">Sign in</button> <span class="note" id="l-msg"></span></div>
+    <div id="panel" hidden>
+      <div class="adm"><label>Home team<input id="a-home"></label><label>Away team<input id="a-away"></label></div>
+      <div class="adm scores">
+        <div><strong id="a-hn">Home</strong><div class="ctr"><button data-s="hs" data-d="-1" aria-label="Home minus">−</button><b id="a-hs">0</b><button data-s="hs" data-d="1" aria-label="Home plus">+</button></div></div>
+        <div><strong id="a-an">Away</strong><div class="ctr"><button data-s="aw" data-d="-1" aria-label="Away minus">−</button><b id="a-aw">0</b><button data-s="aw" data-d="1" aria-label="Away plus">+</button></div></div>
+      </div>
+      <div class="adm"><label>Status<select id="a-status"><option>Upcoming</option><option>Live</option><option>Half Time</option><option>Full Time</option></select></label><label>Match time<input id="a-min" placeholder="e.g. 32'"></label></div>
+      <label class="chk"><input type="checkbox" id="a-show" checked> Show scoreboard on the Live page</label>
+      <p class="note" id="a-msg"></p>
+    </div>
+  </section></div>
 </main>
 
-<footer><span>© ALOYSIUS+ · The Official Broadcasting Team of St. Aloysius' College</span></footer>
+<footer><span>© ALOYSIUS+ · The Official Broadcasting Team of St. Aloysius' College</span><a href="#admin" data-go="admin" style="color:inherit;opacity:.5">Admin</a></footer>
 
 <script>
 /* ==== Edit here ==== */
 const YOUTUBE_VIDEO_ID = "";          // Live video ID (if any), e.g. "dQw4w9WgXcQ"
 const YOUTUBE_CHANNEL_URL = "https://www.youtube.com/"; // Your channel link
+const FIREBASE_DB_URL = "";   // Live score database URL, e.g. https://your-project-default-rtdb.firebaseio.com
+const FIREBASE_API_KEY = "";   // Firebase Web API key (Project settings > General)
+const ADMIN_EMAIL = "";        // Admin email (must be a user in Firebase Authentication)
 const EVENTS = [
   {title:"Annual Prize Giving", date:"2026-11-14", cat:"School", img:"", text:"The annual prize giving ceremony, broadcast live."},
   {title:"Inter-House Sports Meet", date:"2026-10-24", cat:"Sports", text:"The inter-house sports competition."},
@@ -194,6 +226,27 @@ if(d>0){const D=Math.floor(d/864e5),H=Math.floor(d/36e5)%24,M=Math.floor(d/6e4)%
 else if(-d<win){el.className='cd msg now';el.textContent=hasT?'Happening now':'Today'}
 else{el.className='cd msg done';el.textContent='Event ended'}})}
 tick();setInterval(tick,1000);
+/* ---- Live score ---- */
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let idTok='';const api=w=>FIREBASE_DB_URL.replace(/\/$/,'')+'/score.json'+(w&&idTok?'?auth='+idTok:'');
+let S={home:"St. Aloysius",away:"Opponent",hs:0,aw:0,status:"Upcoming",min:"",show:true},last=null;
+function drawBoard(d){const b=$('#board');if(!d||!d.show){b.hidden=true;return}
+const hs=+d.hs||0,aw=+d.aw||0,key=hs+'-'+aw,f=last!==null&&key!==last?'flash':'';b.hidden=false;
+b.innerHTML=`<div class="bt"><span class="bs${d.status==='Live'?' on':''}">${d.status==='Live'?'<i></i>':''}${esc(d.status)}${d.min?' · '+esc(d.min):''}</span></div><div class="bm"><div class="tm">${esc(d.home)}</div><div class="sc"><b class="${f}">${hs}</b><span>-</span><b class="${f}">${aw}</b></div><div class="tm">${esc(d.away)}</div></div>`;last=key}
+async function pull(){if(!FIREBASE_DB_URL)return;try{drawBoard(await(await fetch(api(),{cache:'no-store'})).json())}catch(_){}}
+pull();setInterval(()=>{if($('#live').classList.contains('on'))pull()},3000);
+const A=id=>document.getElementById(id);
+function fill(){A('a-home').value=S.home;A('a-away').value=S.away;A('a-hn').textContent=S.home;A('a-an').textContent=S.away;A('a-hs').textContent=S.hs;A('a-aw').textContent=S.aw;A('a-status').value=S.status;A('a-min').value=S.min;A('a-show').checked=!!S.show}
+let st;function save(){clearTimeout(st);st=setTimeout(async()=>{if(!FIREBASE_DB_URL){A('a-msg').textContent='Set FIREBASE_DB_URL in the file first.';return}try{await ensure();const r=await fetch(api(true),{method:'PUT',body:JSON.stringify(S)});A('a-msg').textContent=r.ok?'Saved ✓ viewers will see it within a few seconds':'Save failed'}catch(_){A('a-msg').textContent='Save failed'}},300)}
+document.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{S[b.dataset.s]=Math.max(0,(+S[b.dataset.s]||0)+ +b.dataset.d);fill();save()});
+[['a-home','home'],['a-away','away'],['a-min','min']].forEach(([i,k])=>A(i).oninput=e=>{S[k]=e.target.value;if(k==='home')A('a-hn').textContent=S[k];if(k==='away')A('a-an').textContent=S[k];save()});
+A('a-status').onchange=e=>{S.status=e.target.value;save()};
+A('a-show').onchange=e=>{S.show=e.target.checked;save()};
+let cred=null,tokT=0;
+async function signIn(e,p){const r=await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key='+FIREBASE_API_KEY,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:e,password:p,returnSecureToken:true})});const j=await r.json();if(!r.ok)throw new Error((j.error&&j.error.message)||'error');idTok=j.idToken;tokT=Date.now();cred={e,p}}
+async function ensure(){if(cred&&Date.now()-tokT>3e6)await signIn(cred.e,cred.p)}
+A('em').value=ADMIN_EMAIL;
+A('unlock').onclick=async()=>{const m=A('l-msg');if(!FIREBASE_API_KEY){m.textContent='Set FIREBASE_API_KEY in the file first.';return}try{await signIn(A('em').value.trim(),A('pw').value)}catch(_){m.textContent='Wrong email or password.';return}A('lock').hidden=true;A('panel').hidden=false;if(FIREBASE_DB_URL){try{const d=await(await fetch(api(),{cache:'no-store'})).json();if(d)S={...S,...d}}catch(_){}}fill()};
 $('#ytlink').href=YOUTUBE_CHANNEL_URL;
 $('#player').innerHTML=YOUTUBE_VIDEO_ID?`<iframe src="https://www.youtube.com/embed/${YOUTUBE_VIDEO_ID}" allowfullscreen title="ALOYSIUS+ Live"></iframe>`:'<div><strong>No live broadcast right now</strong><br>The stream will appear here when the next broadcast starts.</div>';
 $('#theme').addEventListener('click',()=>{const r=document.documentElement;r.dataset.theme=(r.dataset.theme||(matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'))==='dark'?'light':'dark'});
@@ -207,7 +260,7 @@ for(let i=0;i<60;i++)P.push({x:Math.random(),y:Math.random(),r:Math.random()*1.8
 const els=document.querySelectorAll('.about>div,.stats div');els.forEach(e=>e.classList.add('reveal'));
 const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.2});els.forEach(e=>io.observe(e));
 })();
-if(['events','live'].includes(location.hash.slice(1)))go(location.hash.slice(1));
+if(['events','live','admin'].includes(location.hash.slice(1)))go(location.hash.slice(1));
 </script>
 </body>
 </html>
